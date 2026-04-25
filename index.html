@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="description" content="スマホとPCで遊べるオリジナル横スクロールアクションゲーム" />
   <meta name="theme-color" content="#101827" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; manifest-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; manifest-src 'self'; worker-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'">
   <link rel="manifest" href="manifest.json" />
   <title>Neon Runner X</title>
   <style>
@@ -51,6 +51,7 @@
     .card { max-width: 560px; padding: 24px; border: 1px solid var(--line); border-radius: 24px; background: rgba(8,17,31,.82); box-shadow: 0 18px 80px rgba(0,0,0,.45); }
     .card h2 { margin: 0 0 10px; font-size: clamp(28px, 7vw, 52px); line-height: .95; }
     .card p { margin: 8px 0; color: var(--muted); line-height: 1.6; font-weight: 650; }
+    .credit { font-size: 11px; opacity: .75; }
     .start { margin-top: 16px; border: 0; border-radius: 999px; min-height: 52px; padding: 0 26px; color: #06101c; background: linear-gradient(90deg, var(--cyan), var(--green)); font-weight: 950; font-size: 16px; cursor: pointer; box-shadow: 0 16px 42px rgba(78,231,255,.24); }
     .controls {
       display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
@@ -91,19 +92,21 @@
     </header>
     <section class="game-wrap">
       <canvas id="game" width="960" height="540" aria-label="Neon Runner X game screen"></canvas>
+      <audio id="bgm" src="audio/retro-chiptune-action.mp3" preload="auto" loop></audio>
       <div class="overlay" id="overlay">
         <div class="card">
           <h2 id="overlayTitle">Neon Runner X</h2>
           <p id="overlayText">小型ネオンロボを操作して、敵を撃破しながら工場ステージを突破しよう。</p>
-          <p>PC: ← → / A D 移動、Space ジャンプ、J ショット<br>スマホ: 下のボタンで操作 / 音あり</p>
+          <p>PC: ← → / A D 移動、Space ジャンプ、J ショット<br>スマホ: 下のボタンで操作 / BGMあり</p>
           <button class="start" id="startBtn">スタート</button>
+          <p class="credit">BGM: Retro Chiptune (Action) by PeakMusic (Preston Peak) / CC0</p>
         </div>
       </div>
     </section>
     <section class="controls" aria-label="操作ボタン">
       <div class="help">操作: ←→ 移動 / Space ジャンプ / J ショット / R リスタート。スマホは右のボタン。</div>
       <div class="touch">
-        <button id="muteBtn" aria-label="音量">♪</button>
+        <button id="muteBtn" aria-label="音量" aria-pressed="false">♪</button>
         <button data-key="left" aria-label="左">←</button>
         <button data-key="right" aria-label="右">→</button>
         <button data-key="down" aria-label="しゃがむ">↓</button>
@@ -126,6 +129,9 @@
     const overlayTitle = document.getElementById('overlayTitle');
     const overlayText = document.getElementById('overlayText');
     const startBtn = document.getElementById('startBtn');
+    const bgm = document.getElementById('bgm');
+    bgm.volume = 0.28;
+    bgm.muted = false;
     const hpEl = document.getElementById('hp');
     const scoreEl = document.getElementById('score');
     const bossEl = document.getElementById('boss');
@@ -291,19 +297,12 @@
       osc.start(t); osc.stop(t+dur+.02);
     }
     function startMusic() {
-      if (!audioCtx || musicTimer || muted || document.hidden) return;
-      const scale = [196, 247, 294, 330, 392, 494, 392, 330, 294, 247, 294, 330, 392, 330, 247, 196];
-      musicTimer = setInterval(() => {
-        if (!running || muted || document.hidden) return;
-        const n = scale[musicStep % scale.length];
-        tone(n, .07, 'square', .018);
-        if (musicStep % 4 === 0) tone(n/2, .09, 'triangle', .024);
-        musicStep++;
-      }, 155);
+      bgm.muted = muted;
+      if (muted || document.hidden) return;
+      bgm.play().catch(() => { document.getElementById('muteBtn').textContent = '▶'; });
     }
     function stopMusic() {
-      if (musicTimer) clearInterval(musicTimer);
-      musicTimer = null;
+      bgm.pause();
     }
     function sfx(kind) {
       if (kind === 'shoot') tone(740, .045, 'square', .05);
@@ -402,9 +401,9 @@
     addEventListener('keyup', e => { const m={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right',ArrowDown:'down',s:'down',S:'down',' ':'jump',j:'fire',J:'fire'}; if(m[e.key]) setKey(m[e.key],false); });
     addEventListener('blur', clearInput);
     document.addEventListener('visibilitychange', () => { if (document.hidden) { clearInput(); stopMusic(); } else if (running) startMusic(); });
-    document.querySelectorAll('[data-key]').forEach(btn => { const k=btn.dataset.key; const on=e=>{e.preventDefault(); btn.setPointerCapture?.(e.pointerId); setKey(k,true);}; const off=e=>{e.preventDefault(); setKey(k,false);}; btn.addEventListener('pointerdown',on); btn.addEventListener('pointerup',off); btn.addEventListener('pointercancel',off); });
+    document.querySelectorAll('[data-key]').forEach(btn => { const k=btn.dataset.key; const on=e=>{e.preventDefault(); btn.setPointerCapture?.(e.pointerId); setKey(k,true);}; const off=e=>{e.preventDefault(); setKey(k,false);}; btn.addEventListener('pointerdown',on); btn.addEventListener('pointerup',off); btn.addEventListener('pointercancel',off); btn.addEventListener('pointerleave',off); });
     startBtn.addEventListener('click', reset);
-    document.getElementById('muteBtn').addEventListener('click', () => { muted = !muted; document.getElementById('muteBtn').textContent = muted ? '×' : '♪'; if (muted) stopMusic(); else { initAudio(); startMusic(); } });
+    document.getElementById('muteBtn').addEventListener('click', () => { muted = !muted; bgm.muted = muted; const btn = document.getElementById('muteBtn'); btn.textContent = muted ? '×' : '♪'; btn.setAttribute('aria-pressed', String(muted)); if (muted) stopMusic(); else { initAudio(); startMusic(); } });
     if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
     renderHud(); requestAnimationFrame(loop);
   </script>
